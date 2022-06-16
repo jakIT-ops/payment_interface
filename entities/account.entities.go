@@ -13,15 +13,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// interface
-type AccountCrud interface {
-	GetAccounts(c *fiber.Ctx) error
-	GetAccount(c *fiber.Ctx) error
-	CreateAccount(c *fiber.Ctx) error
-	UpdateAccount(c *fiber.Ctx) error
-	DeleteAccount(c *fiber.Ctx) error
-}
-
 type Account struct {
 	ID        int32  `gorm:"primaryKey"`
 	AccountId string `json:"id"`
@@ -29,6 +20,41 @@ type Account struct {
 	Currency  string `json:"currency"`
 }
 
+// interface functions
+func (Account Account) GetAccountBalance(id string) float64 {
+
+	var Amount float64
+	var creditAmount float64
+	var debitAmount float64
+
+	database.Database.Db.Raw("SELECT SUM(debit_amount) FROM transactions WHERE account_id = ?", id).Scan(&debitAmount)
+
+	database.Database.Db.Raw("SELECT SUM(credit_amount) FROM transactions WHERE account_id = ?", id).Scan(&creditAmount)
+
+	Amount = creditAmount - debitAmount
+	return Amount
+}
+
+type ResultTra struct {
+	DebitAmount  float64 `json:"debit_amount"`
+	CreditAmount float64 `json:"credit_amount"`
+}
+
+func (Account Account) GetLastTransaction(id string) (float64, float64) {
+	var res ResultTra
+
+	database.Database.Db.Raw("SELECT debit_amount, credit_amount FROM transactions WHERE account_id = ? ORDER BY transaction_id DESC LIMIT 1", id).Scan(&res)
+	return res.DebitAmount, res.CreditAmount
+}
+
+func (acc Account) GetCurrency(id string) string {
+	var res string
+
+	database.Database.Db.Raw("SELECT currency FROM accounts WHERE account_id = ?", id).Scan(&res)
+	return res
+}
+
+// CRUD
 func (acc Account) GetAccounts(c *fiber.Ctx) error {
 	accounts := []models.Account{}
 	database.Database.Db.Find(&accounts)
